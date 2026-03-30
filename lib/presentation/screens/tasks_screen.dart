@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/logger.dart';
+import '../../core/analytics_service.dart';
 import '../../domain/entities/task.dart';
+import '../../presentation/widgets/status_widget_factory.dart';
 import '../viewmodels/tasks_viewmodel.dart';
 
-// View — только отображает состояние из ViewModel.
-// Не содержит бизнес-логики.
 class TasksScreen extends StatefulWidget {
   final TasksViewModel viewModel;
-
   const TasksScreen({super.key, required this.viewModel});
 
   @override
@@ -16,16 +16,22 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   final _textController = TextEditingController();
 
+  // Место 2: Singleton используется в View
+  final _logger = Logger();
+  final _analytics = AnalyticsService();
+
   TasksViewModel get _vm => widget.viewModel;
 
   @override
   void initState() {
     super.initState();
-    _vm.addListener(_onViewModelUpdate);
+    _logger.log('TasksScreen открыт');
+    _analytics.track('screen_view', params: {'screen': 'tasks'});
+    _vm.addListener(_onUpdate);
     _vm.loadTasks();
   }
 
-  void _onViewModelUpdate() {
+  void _onUpdate() {
     setState(() {});
     if (_vm.errorMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -48,21 +54,26 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   void dispose() {
-    _vm.removeListener(_onViewModelUpdate);
+    _logger.log('TasksScreen закрыт');
+    _vm.removeListener(_onUpdate);
     _textController.dispose();
     super.dispose();
   }
 
   void _showAddDialog() {
     _textController.clear();
+    _analytics.track('add_dialog_opened');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Новая задача'),
+        backgroundColor: const Color(0xFF161B22),
+        title: const Text('Новая задача', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: _textController,
+          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             hintText: 'Введите название...',
+            hintStyle: TextStyle(color: Colors.grey),
             border: OutlineInputBorder(),
           ),
           autofocus: true,
@@ -93,7 +104,7 @@ class _TasksScreenState extends State<TasksScreen> {
       backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
         backgroundColor: const Color(0xFF161B22),
-        title: const Text('Tasks', style: TextStyle(color: Colors.white)),
+        title: const Text('Tasks — Singleton & Factory', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
@@ -111,9 +122,26 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _buildBody() {
+    // Место использования StatusWidgetFactory (Factory pattern)
     if (_vm.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.deepPurple),
+      return StatusWidgetFactory.create(
+        LoadStatus.loading,
+        message: 'Загрузка задач...',
+      );
+    }
+
+    if (_vm.errorMessage != null && _vm.tasks.isEmpty) {
+      return StatusWidgetFactory.create(
+        LoadStatus.error,
+        message: _vm.errorMessage,
+        onRetry: _vm.loadTasks,
+      );
+    }
+
+    if (_vm.tasks.isEmpty) {
+      return StatusWidgetFactory.create(
+        LoadStatus.success,
+        message: 'Нет задач. Нажмите + чтобы добавить',
       );
     }
 
@@ -121,18 +149,11 @@ class _TasksScreenState extends State<TasksScreen> {
       children: [
         _buildStats(),
         Expanded(
-          child: _vm.tasks.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Нет задач. Нажмите + чтобы добавить',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: _vm.tasks.length,
-                  itemBuilder: (ctx, i) => _buildTaskItem(_vm.tasks[i]),
-                ),
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: _vm.tasks.length,
+            itemBuilder: (ctx, i) => _buildTaskItem(_vm.tasks[i]),
+          ),
         ),
       ],
     );
@@ -196,7 +217,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 }
 
@@ -204,7 +225,6 @@ class _StatChip extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
-
   const _StatChip({required this.label, required this.value, required this.color});
 
   @override
