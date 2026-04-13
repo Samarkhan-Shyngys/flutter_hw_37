@@ -49,3 +49,27 @@ getIt.registerFactory(() => TasksViewModel(getIt(), getIt(), getIt(), getIt()));
 flutter pub get
 flutter run
 ```
+
+---
+
+## Скриншоты
+
+### Главный экран
+![Home](images/tasks.png)
+
+### Экран задач
+<p float="left">
+  <img src="images/home.png" width="200"/>
+  <img src="images/tasks_screen.png" width="200"/>
+  <img src="images/add_task_dialog.png" width="200"/>
+</p>
+
+### Factory Demo
+<p float="left">
+  <img src="images/factory_demo.png" width="200"/>
+  <img src="images/factory_success.png" width="200"/>
+  <img src="images/api_factory.png" width="200"/>
+</p>
+
+### Singleton vs DI
+![Comparison](images/comparison.png)
